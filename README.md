@@ -1,3 +1,8 @@
+# NOTICE
+This is a working branch specifically designed for [ZigBrains](https://github.com/FalsePattern/ZigBrains).
+It may not be always up-to-date with upstream,
+and may contain questionable tweaks specifically designed with ZLS in mind. 
+
 # [LSP4IntelliJ](#sp4intellij) - Language Server Protocol Support for the  Jetbrains Plugins
 
 [![Build Status](https://travis-ci.com/ballerina-platform/lsp4intellij.svg?branch=master)](https://travis-ci.com/ballerina-platform/lsp4intellij)
