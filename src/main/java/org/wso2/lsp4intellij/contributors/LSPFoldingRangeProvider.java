@@ -46,8 +46,6 @@ import static org.wso2.lsp4intellij.requests.Timeout.getTimeout;
 public class LSPFoldingRangeProvider extends CustomFoldingBuilder {
 
     protected Logger LOG = Logger.getInstance(LSPFoldingRangeProvider.class);
-    private Editor editor;
-    private LanguageServerWrapper wrapper;
 
     @Override
     protected void buildLanguageFoldRegions(@NotNull List<FoldingDescriptor> descriptors, @NotNull PsiElement root, @NotNull Document document, boolean quick) {
@@ -56,10 +54,11 @@ public class LSPFoldingRangeProvider extends CustomFoldingBuilder {
             return;
         }
 
-        if (editor == null || wrapper == null) {
-            PsiFile psiFile = root.getContainingFile();
-            editor = FileUtils.editorFromPsiFile(psiFile);
-            wrapper = LanguageServerWrapper.forVirtualFile(psiFile.getVirtualFile(), root.getProject());
+        PsiFile psiFile = root.getContainingFile();
+        var editor = FileUtils.editorFromPsiFile(psiFile);
+        var wrapper = LanguageServerWrapper.forVirtualFile(psiFile.getVirtualFile(), root.getProject());
+        if (editor == null || wrapper == null || !editor.getDocument().equals(document)) {
+            return;
         }
 
         String url = root.getContainingFile().getVirtualFile().getUrl();
@@ -73,9 +72,14 @@ public class LSPFoldingRangeProvider extends CustomFoldingBuilder {
                 wrapper.notifySuccess(Timeouts.FOLDING);
 
                 for (FoldingRange foldingRange : foldingRanges) {
-                    int start = getStartOffset(foldingRange, document);
-                    int end = getEndOffset(foldingRange, document);
-                    if (end - start <= 0) {
+                    int start = getStartOffset(editor, foldingRange, document);
+                    int end = getEndOffset(editor, foldingRange, document);
+                    int length = end - start;
+                    if (length <= 0) {
+                        continue;
+                    }
+
+                    if (length > root.getTextLength()) {
                         continue;
                     }
 
@@ -95,7 +99,7 @@ public class LSPFoldingRangeProvider extends CustomFoldingBuilder {
         }
     }
 
-    private int getEndOffset(@NotNull FoldingRange foldingRange, @NotNull Document document) {
+    private int getEndOffset(Editor editor, @NotNull FoldingRange foldingRange, @NotNull Document document) {
         // EndCharacter is optional. When missing, it should be set to the length of the end line.
         if (foldingRange.getEndCharacter() == null) {
             return document.getLineEndOffset(foldingRange.getEndLine());
@@ -104,7 +108,7 @@ public class LSPFoldingRangeProvider extends CustomFoldingBuilder {
         return DocumentUtils.LSPPosToOffset(editor, new Position(foldingRange.getEndLine(), foldingRange.getEndCharacter()));
     }
 
-    private int getStartOffset(@NotNull FoldingRange foldingRange, @NotNull Document document) {
+    private int getStartOffset(Editor editor, @NotNull FoldingRange foldingRange, @NotNull Document document) {
         // StartCharacter is optional. When missing, it should be set to the length of the start line.
         if (foldingRange.getStartCharacter() == null) {
             return document.getLineEndOffset(foldingRange.getStartLine());
