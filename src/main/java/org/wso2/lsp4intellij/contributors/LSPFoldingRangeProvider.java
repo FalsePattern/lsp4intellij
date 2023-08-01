@@ -61,10 +61,16 @@ public class LSPFoldingRangeProvider extends CustomFoldingBuilder {
             return;
         }
 
+        var manager = wrapper.getRequestManager();
+        if (manager == null) {
+            //IDE startup race condition
+            return;
+        }
+
         String url = root.getContainingFile().getVirtualFile().getUrl();
         TextDocumentIdentifier textDocumentIdentifier = new TextDocumentIdentifier(url);
         FoldingRangeRequestParams params = new FoldingRangeRequestParams(textDocumentIdentifier);
-        CompletableFuture<List<FoldingRange>> future = wrapper.getRequestManager().foldingRange(params);
+        CompletableFuture<List<FoldingRange>> future = manager.foldingRange(params);
 
         if (future != null) {
             try {
