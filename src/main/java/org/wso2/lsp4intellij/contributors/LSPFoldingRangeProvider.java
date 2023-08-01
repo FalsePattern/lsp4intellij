@@ -30,6 +30,7 @@ import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.eclipse.lsp4j.jsonrpc.JsonRpcException;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.wso2.lsp4intellij.client.languageserver.wrapper.LanguageServerWrapper;
 import org.wso2.lsp4intellij.requests.Timeouts;
 import org.wso2.lsp4intellij.utils.DocumentUtils;
@@ -89,8 +90,9 @@ public class LSPFoldingRangeProvider extends CustomFoldingBuilder {
                         continue;
                     }
 
-                    if (foldingRange.getCollapsedText() != null) {
-                        descriptors.add(new FoldingDescriptor(root.getNode(), new TextRange(start, end), null, foldingRange.getCollapsedText()));
+                    var collapsedText = getCollapsedText(foldingRange);
+                    if (collapsedText != null) {
+                        descriptors.add(new FoldingDescriptor(root.getNode(), new TextRange(start, end), null, collapsedText));
                     } else {
                         descriptors.add(new FoldingDescriptor(root.getNode(), new TextRange(start, end)));
                     }
@@ -103,6 +105,10 @@ public class LSPFoldingRangeProvider extends CustomFoldingBuilder {
                 wrapper.crashed(e);
             }
         }
+    }
+
+    protected @Nullable String getCollapsedText(@NotNull FoldingRange foldingRange) {
+        return foldingRange.getCollapsedText();
     }
 
     private int getEndOffset(Editor editor, @NotNull FoldingRange foldingRange, @NotNull Document document) {
