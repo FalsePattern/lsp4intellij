@@ -79,7 +79,7 @@ public class LSPFoldingRangeProvider extends CustomFoldingBuilder {
                         continue;
                     }
 
-                    if (length > root.getTextLength()) {
+                    if (end > root.getTextLength()) {
                         continue;
                     }
 
