@@ -18,9 +18,11 @@ package org.wso2.lsp4intellij.contributors;
 import com.intellij.lang.ASTNode;
 import com.intellij.lang.folding.CustomFoldingBuilder;
 import com.intellij.lang.folding.FoldingDescriptor;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
@@ -36,25 +38,88 @@ import org.wso2.lsp4intellij.requests.Timeouts;
 import org.wso2.lsp4intellij.utils.DocumentUtils;
 import org.wso2.lsp4intellij.utils.FileUtils;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 
 import static org.wso2.lsp4intellij.requests.Timeout.getTimeout;
 
 public class LSPFoldingRangeProvider extends CustomFoldingBuilder {
+    private static final Key<Boolean> ASYNC_FOLDING_KEY = new Key<>("ASYNC_FOLDING");
 
     protected Logger LOG = Logger.getInstance(LSPFoldingRangeProvider.class);
 
+    private interface FoldingRangeAcceptor {
+        void accept(int start, int end, @Nullable String replacement);
+    }
+
+    private static class AFoldingRange {
+        public final int start;
+        public final int end;
+        public final String collapsedText;
+
+        private AFoldingRange(int start, int end, String collapsedText) {
+            this.start = start;
+            this.end = end;
+            this.collapsedText = collapsedText;
+        }
+    }
+
     @Override
     protected void buildLanguageFoldRegions(@NotNull List<FoldingDescriptor> descriptors, @NotNull PsiElement root, @NotNull Document document, boolean quick) {
-        // if quick flag is set, we do nothing here
+        // if the quick flag is set, we do nothing here
         if (quick) {
             return;
         }
 
+        var async = async();
+        if (!async) {
+            doBuildLanguageFoldRegions((start, end, collapsedText) -> {
+                if (collapsedText != null) {
+                    descriptors.add(new FoldingDescriptor(root.getNode(), new TextRange(start, end), null, collapsedText));
+                } else {
+                    descriptors.add(new FoldingDescriptor(root.getNode(), new TextRange(start, end)));
+                }
+            }, root, document, false);
+            return;
+        }
+        var app = ApplicationManager.getApplication();
+        app.executeOnPooledThread(() -> {
+            var ranges = new ArrayList<AFoldingRange>();
+            doBuildLanguageFoldRegions((start, end, collapsedText) -> ranges.add(
+                                               new AFoldingRange(start, end, collapsedText == null ? "..." : collapsedText)),
+                                       root, document, true);
+            var editor = FileUtils.editorFromPsiFile(root.getContainingFile());
+            app.invokeLater(() -> {
+                if (editor.isDisposed()) {
+                    return;
+                }
+                var foldingModel = editor.getFoldingModel();
+                var oldRegions = Arrays.stream(foldingModel.getAllFoldRegions()).filter(region -> {
+                    var data = region.getUserData(ASYNC_FOLDING_KEY);
+                    return data != null && data;
+                }).collect(Collectors.toList());
+                foldingModel.runBatchFoldingOperation(() -> {
+                    for (var oldRegion: oldRegions) {
+                        foldingModel.removeFoldRegion(oldRegion);
+                    }
+                    for (var range: ranges) {
+                        var region = foldingModel.addFoldRegion(range.start, range.end, range.collapsedText);
+                        if (region != null) {
+                            region.putUserData(ASYNC_FOLDING_KEY, true);
+                        }
+                    }
+                });
+            });
+        });
+    }
+
+    private void doBuildLanguageFoldRegions(@NotNull FoldingRangeAcceptor acceptor, @NotNull PsiElement root, @NotNull Document document, boolean async) {
         PsiFile psiFile = root.getContainingFile();
         var editor = FileUtils.editorFromPsiFile(psiFile);
         var wrapper = LanguageServerWrapper.forVirtualFile(psiFile.getVirtualFile(), root.getProject());
@@ -65,45 +130,60 @@ public class LSPFoldingRangeProvider extends CustomFoldingBuilder {
         var manager = wrapper.getRequestManager();
         if (manager == null) {
             //IDE startup race condition
-            return;
+            if (!async)
+                return;
+
+            //We can block the async thread for a moment; wait 2 more seconds
+            for (int i = 0; i < 20 && manager == null; i++) {
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    //We got interrupted, bail
+                    return;
+                }
+                manager = wrapper.getRequestManager();
+            }
+            if (manager == null)
+                return; //LSP did not connect in time, bail
         }
 
         TextDocumentIdentifier textDocumentIdentifier = FileUtils.editorToLSPIdentifier(editor);
         FoldingRangeRequestParams params = new FoldingRangeRequestParams(textDocumentIdentifier);
         CompletableFuture<List<FoldingRange>> future = manager.foldingRange(params);
 
-        if (future != null) {
-            try {
-                List<FoldingRange> foldingRanges = future.get(getTimeout(Timeouts.FOLDING), TimeUnit.MILLISECONDS);
-                wrapper.notifySuccess(Timeouts.FOLDING);
-
-                for (FoldingRange foldingRange : foldingRanges) {
-                    int start = getStartOffset(editor, foldingRange, document);
-                    int end = getEndOffset(editor, foldingRange, document);
-                    int length = end - start;
-                    if (length <= 0) {
-                        continue;
-                    }
-
-                    if (end > root.getTextLength()) {
-                        continue;
-                    }
-
-                    var collapsedText = getCollapsedText(foldingRange);
-                    if (collapsedText != null) {
-                        descriptors.add(new FoldingDescriptor(root.getNode(), new TextRange(start, end), null, collapsedText));
-                    } else {
-                        descriptors.add(new FoldingDescriptor(root.getNode(), new TextRange(start, end)));
-                    }
-                }
-            } catch (TimeoutException | InterruptedException e) {
-                LOG.warn(e);
-                wrapper.notifyFailure(Timeouts.FOLDING);
-            } catch (JsonRpcException | ExecutionException e) {
-                LOG.warn(e);
-                wrapper.crashed(e);
-            }
+        if (future == null) {
+            return;
         }
+        try {
+            List<FoldingRange> foldingRanges = future.get(getTimeout(Timeouts.FOLDING), TimeUnit.MILLISECONDS);
+            wrapper.notifySuccess(Timeouts.FOLDING);
+
+            for (FoldingRange foldingRange : foldingRanges) {
+                int start = getStartOffset(editor, foldingRange, document);
+                int end = getEndOffset(editor, foldingRange, document);
+                int length = end - start;
+                if (length <= 0) {
+                    continue;
+                }
+
+                if (end > root.getTextLength()) {
+                    continue;
+                }
+
+                var collapsedText = getCollapsedText(foldingRange);
+                acceptor.accept(start, end, collapsedText);
+            }
+        } catch (TimeoutException | InterruptedException e) {
+            LOG.warn(e);
+            wrapper.notifyFailure(Timeouts.FOLDING);
+        } catch (JsonRpcException | ExecutionException e) {
+            LOG.warn(e);
+            wrapper.crashed(e);
+        }
+    }
+
+    protected boolean async() {
+        return true;
     }
 
     protected @Nullable String getCollapsedText(@NotNull FoldingRange foldingRange) {
