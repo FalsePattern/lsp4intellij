@@ -1,0 +1,6 @@
+[versions]
+# plugins
+gradleIntelliJPlugin = "1.15.0"
+
+[plugins]
+gradleIntelliJPlugin = { id = "org.jetbrains.intellij", version.ref = "gradleIntelliJPlugin" }
