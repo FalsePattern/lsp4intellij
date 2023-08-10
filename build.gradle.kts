@@ -4,6 +4,7 @@ fun environment(key: String) = providers.environmentVariable(key)
 
 plugins {
     id("java")
+    id("maven-publish")
     alias(libs.plugins.gradleIntelliJPlugin)
     id("com.github.gradle-git-version-calculator") version("1.1.0")
 }
@@ -55,5 +56,16 @@ tasks {
         project.file("jbr/bin/java")
                 .takeIf { it.exists() }
                 ?.let { projectExecutable.set(it.toString()) }
+    }
+}
+
+publishing {
+    publications {
+        register<MavenPublication>("maven") {
+            from(components.getByName("java"))
+            groupId = project.group.toString()
+            artifactId = "lsp4intellij"
+            version = project.version.toString()
+        }
     }
 }
