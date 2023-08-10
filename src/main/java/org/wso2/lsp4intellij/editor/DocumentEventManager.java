@@ -136,7 +136,6 @@ public class DocumentEventManager {
             }
             Range range = new Range(new Position(startLine, startColumn), new Position(endLine, endColumn));
             changeEvent.setRange(range);
-            changeEvent.setRangeLength(newTextLength);
             changeEvent.setText(newText.toString());
         } else if (syncKind == TextDocumentSyncKind.Full) {
             changesParams.getContentChanges().get(0).setText(document.getText());

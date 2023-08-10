@@ -55,7 +55,7 @@ import static org.wso2.lsp4intellij.utils.ApplicationUtils.pool;
 import static org.wso2.lsp4intellij.utils.FileUtils.reloadAllEditors;
 import static org.wso2.lsp4intellij.utils.FileUtils.reloadEditors;
 
-public class IntellijLanguageClient implements ApplicationComponent, Disposable {
+public class IntellijLanguageClient {
 
     private static Logger LOG = Logger.getInstance(IntellijLanguageClient.class);
     private static final Map<Pair<String, String>, LanguageServerWrapper> extToLanguageWrapper = new ConcurrentHashMap<>();
@@ -64,29 +64,29 @@ public class IntellijLanguageClient implements ApplicationComponent, Disposable 
     private static Map<String, LSPExtensionManager> extToExtManager = new ConcurrentHashMap<>();
     private static final Predicate<LanguageServerWrapper> RUNNING = (s) -> s.getStatus() != ServerStatus.STOPPED;
 
-    @Override
-    public void initComponent() {
-        try {
-            // Adds project listener.
-            ApplicationManager.getApplication().getMessageBus().connect().subscribe(ProjectManager.TOPIC,
-                    new LSPProjectManagerListener());
-            // Adds editor listener.
-            EditorFactory.getInstance().addEditorFactoryListener(new LSPEditorListener(), this);
-            // Adds VFS listener.
-            VirtualFileManager.getInstance().addVirtualFileListener(new VFSListener());
-            // Adds document event listener.
-            ApplicationManager.getApplication().getMessageBus().connect().subscribe(AppTopics.FILE_DOCUMENT_SYNC,
-                    new LSPFileDocumentManagerListener());
-
-            // in case if JVM forcefully exit.
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> projectToLanguageWrappers.values().stream()
-                    .flatMap(Collection::stream).filter(RUNNING).forEach(s -> s.stop(true))));
-
-            LOG.info("Intellij Language Client initialized successfully");
-        } catch (Exception e) {
-            LOG.warn("Fatal error occurred when initializing Intellij language client.", e);
-        }
-    }
+//    @Override
+//    public void initComponent() {
+//        try {
+//            // Adds project listener.
+//            ApplicationManager.getApplication().getMessageBus().connect().subscribe(ProjectManager.TOPIC,
+//                    new LSPProjectManagerListener());
+//            // Adds editor listener.
+//            EditorFactory.getInstance().addEditorFactoryListener(new LSPEditorListener(), this);
+//            // Adds VFS listener.
+//            VirtualFileManager.getInstance().addVirtualFileListener(new VFSListener());
+//            // Adds document event listener.
+//            ApplicationManager.getApplication().getMessageBus().connect().subscribe(AppTopics.FILE_DOCUMENT_SYNC,
+//                    new LSPFileDocumentManagerListener());
+//
+//            // in case if JVM forcefully exit.
+//            Runtime.getRuntime().addShutdownHook(new Thread(() -> projectToLanguageWrappers.values().stream()
+//                    .flatMap(Collection::stream).filter(RUNNING).forEach(s -> s.stop(true))));
+//
+//            LOG.info("Intellij Language Client initialized successfully");
+//        } catch (Exception e) {
+//            LOG.warn("Fatal error occurred when initializing Intellij language client.", e);
+//        }
+//    }
 
     /**
      * Use it to initialize the server connection for the given project (useful if no editor is launched)
@@ -371,15 +371,15 @@ public class IntellijLanguageClient implements ApplicationComponent, Disposable 
         return Optional.ofNullable(extToExtManager.get(definition.ext.split(",")[0]));
     }
 
-    @Override
-    public void disposeComponent() {
-        Disposer.dispose(this);
-    }
+//    @Override
+//    public void disposeComponent() {
+//        Disposer.dispose(this);
+//    }
 
-    @Override
-    public void dispose() {
-        Disposer.dispose(this);
-    }
+//    @Override
+//    public void dispose() {
+//        Disposer.dispose(this);
+//    }
 
     private static void processDefinition(LanguageServerDefinition definition, String projectUri) {
         String[] extensions = definition.ext.split(LanguageServerDefinition.SPLIT_CHAR);

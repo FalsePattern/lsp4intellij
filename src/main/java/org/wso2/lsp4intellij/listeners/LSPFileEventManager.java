@@ -162,8 +162,7 @@ class LSPFileEventManager {
                 // Getting the right file is not trivial here since we only have the file name. Since we have to iterate over
                 // all opened projects and filter based on the file name.
                 Set<VirtualFile> files = Arrays.stream(ProjectManager.getInstance().getOpenProjects())
-                    .flatMap(p -> Arrays.stream(searchFiles(newFileName, p)))
-                    .map(PsiFile::getVirtualFile)
+                    .flatMap(p -> searchFiles(newFileName, p).stream())
                     .collect(Collectors.toSet());
 
                 for (VirtualFile file : files) {

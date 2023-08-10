@@ -47,6 +47,8 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -327,17 +329,16 @@ public class FileUtils {
     @NotNull
     public static Set<Project> findProjectsFor(@NotNull VirtualFile file) {
         return Arrays.stream(ProjectManager.getInstance().getOpenProjects())
-                .flatMap(p -> Arrays.stream(searchFiles(file.getName(), p)))
-                .filter(f -> f.getVirtualFile().getPath().equals(file.getPath())).map(PsiElement::getProject)
+                .filter(p -> searchFiles(file.getName(), p).stream().anyMatch(f -> f.getPath().equals(file.getPath())))
                 .collect(Collectors.toSet());
     }
 
-    public static PsiFile[] searchFiles(String fileName, Project p) {
+    public static Collection<VirtualFile> searchFiles(String fileName, Project p) {
         try {
-            return computableReadAction(() -> FilenameIndex.getFilesByName(p, fileName, GlobalSearchScope.projectScope(p)));
+            return computableReadAction(() -> FilenameIndex.getVirtualFilesByName(fileName, GlobalSearchScope.projectScope(p)));
         } catch (Throwable t) {
             // Todo - Find a proper way to handle when IDEA file indexing is in-progress.
-            return new PsiFile[0];
+            return Collections.emptyList();
         }
     }
 
