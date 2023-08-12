@@ -53,21 +53,21 @@ public class LSPDocumentationTargetProvider implements DocumentationTargetProvid
         @Nullable
         @Override
         public DocumentationResult computeDocumentation() {
+            var editor = FileUtils.editorFromPsiFile(file);
+            if (editor == null) {
+                return null;
+            }
+            var manager = EditorEventManagerBase.forEditor(editor);
+            if (manager == null) {
+                return null;
+            }
+            var wrapper = manager.wrapper;
+            if (wrapper == null) {
+                return null;
+            }
+            var caretPos = editor.offsetToLogicalPosition(offset);
+            var serverPos = ApplicationUtils.computableReadAction(() -> DocumentUtils.logicalToLSPPos(caretPos, editor));
             return DocumentationResult.asyncDocumentation(() -> {
-                var editor = FileUtils.editorFromPsiFile(file);
-                if (editor == null) {
-                    return null;
-                }
-                var manager = EditorEventManagerBase.forEditor(editor);
-                if (manager == null) {
-                    return null;
-                }
-                var wrapper = manager.wrapper;
-                if (wrapper == null) {
-                    return null;
-                }
-                var caretPos = editor.offsetToLogicalPosition(offset);
-                var serverPos = ApplicationUtils.computableReadAction(() -> DocumentUtils.logicalToLSPPos(caretPos, editor));
                 var identifier = manager.getIdentifier();
                 var request = wrapper.getRequestManager().hover(new HoverParams(identifier, serverPos));
                 if (request == null) {
