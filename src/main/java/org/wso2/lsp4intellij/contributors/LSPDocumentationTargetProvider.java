@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 
 public class LSPDocumentationTargetProvider implements DocumentationTargetProvider {
     @Override
@@ -88,7 +89,7 @@ public class LSPDocumentationTargetProvider implements DocumentationTargetProvid
                                                identifier.getUri(), serverPos.getLine(), serverPos.getCharacter()));
                         return null;
                     }
-                    return DocumentationResult.documentation(string);
+                    return DocumentationResult.documentation(string.lines().collect(Collectors.joining("<br>\n")));
                 } catch (TimeoutException e) {
                     LOG.warn(e);
                     wrapper.notifyFailure(Timeouts.HOVER);
