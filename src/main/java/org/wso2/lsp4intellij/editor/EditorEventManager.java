@@ -87,7 +87,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import static org.wso2.lsp4intellij.editor.EditorEventManagerBase.*;
 import static org.wso2.lsp4intellij.requests.Timeout.getTimeout;
@@ -135,6 +134,7 @@ public class EditorEventManager {
     private final List<Diagnostic> diagnostics = new ArrayList<>();
     private AnnotationHolder anonHolder;
     private List<Annotation> annotations = new ArrayList<>();
+    private WeakHashMap<Annotation, CodeActionRequest> annotationRequests = new WeakHashMap<>();
     private volatile boolean diagnosticSyncRequired = true;
     private volatile boolean codeActionSyncRequired = false;
 
@@ -444,6 +444,10 @@ public class EditorEventManager {
     public synchronized List<Annotation> getAnnotations() {
         this.codeActionSyncRequired = false;
         return this.annotations;
+    }
+
+    public synchronized Map<Annotation, CodeActionRequest> fetchAnnotationRequests() {
+        return annotationRequests;
     }
 
     public synchronized void setAnnotations(List<Annotation> annotations) {
@@ -1432,8 +1436,9 @@ public class EditorEventManager {
                         int start = annotation.getStartOffset();
                         int end = annotation.getEndOffset();
                         if (start <= caretPos && end >= caretPos) {
-                            annotation.registerFix(new LSPCommandFix(FileUtils.editorToURIString(editor), command),
-                                    new TextRange(start, end));
+                            annotationRequests.put(annotation,
+                                                   new CodeActionRequest(new LSPCommandFix(FileUtils.editorToURIString(editor), command),
+                                                                         new TextRange(start, end)));
                             codeActionSyncRequired = true;
                         }
                     });
@@ -1444,8 +1449,9 @@ public class EditorEventManager {
                         int start = annotation.getStartOffset();
                         int end = annotation.getEndOffset();
                         if (start <= caretPos && end >= caretPos) {
-                            annotation.registerFix(new LSPCodeActionFix(FileUtils.editorToURIString(editor),
-                                    codeAction), new TextRange(start, end));
+                            annotationRequests.put(annotation,
+                                                   new CodeActionRequest(new LSPCodeActionFix(FileUtils.editorToURIString(editor),
+                                                                                              codeAction), new TextRange(start, end)));
                             codeActionSyncRequired = true;
                         }
                     });

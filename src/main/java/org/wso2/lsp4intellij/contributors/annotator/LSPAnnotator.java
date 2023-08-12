@@ -106,7 +106,9 @@ public class LSPAnnotator extends ExternalAnnotator<Object, Object> {
             String uri = FileUtils.VFSToURI(virtualFile);
             // TODO annotations are applied to a file / document not to an editor. so store them by file and not by editor..
             EditorEventManager eventManager = EditorEventManagerBase.forUri(uri);
-
+            if (eventManager == null) {
+                return;
+            }
             if (eventManager.isCodeActionSyncRequired()) {
                 try {
                     updateAnnotations(holder, eventManager);
@@ -134,20 +136,24 @@ public class LSPAnnotator extends ExternalAnnotator<Object, Object> {
         if (annotations == null) {
             return;
         }
+        var requests = eventManager.fetchAnnotationRequests();
         annotations.forEach(annotation -> {
-            if (annotation.getQuickFixes() == null || annotation.getQuickFixes().isEmpty()) {
-                return;
+            if  (annotation.getQuickFixes() != null && !annotation.getQuickFixes().isEmpty()) {
+                AnnotationBuilder builder = holder.newAnnotation(annotation.getSeverity(), annotation.getMessage());
+                for (Annotation.QuickFixInfo quickFixInfo : annotation.getQuickFixes()) {
+                    builder = builder.withFix(quickFixInfo.quickFix);
+                }
+                builder.create();
+            } else if (requests.containsKey(annotation)) {
+                AnnotationBuilder builder = holder.newAnnotation(annotation.getSeverity(), annotation.getMessage());
+                var request = requests.remove(annotation);
+                builder.newFix(request.action()).range(request.range()).registerFix().create();
             }
-            AnnotationBuilder builder = holder.newAnnotation(annotation.getSeverity(), annotation.getMessage());
-            for (Annotation.QuickFixInfo quickFixInfo : annotation.getQuickFixes()) {
-                builder = builder.withFix(quickFixInfo.quickFix);
-            }
-            builder.create();
         });
     }
 
     @Nullable
-    protected Annotation createAnnotation(Editor editor, AnnotationHolder holder, Diagnostic diagnostic) {
+    protected AnnotationBuilder createAnnotation(Editor editor, AnnotationHolder holder, Diagnostic diagnostic) {
         final int start = DocumentUtils.LSPPosToOffset(editor, diagnostic.getRange().getStart());
         final int end = DocumentUtils.LSPPosToOffset(editor, diagnostic.getRange().getEnd());
         if (start >= end) {
@@ -155,12 +161,8 @@ public class LSPAnnotator extends ExternalAnnotator<Object, Object> {
         }
         final TextRange range = new TextRange(start, end);
 
-        holder.newAnnotation(lspToIntellijAnnotationsMap.get(diagnostic.getSeverity()), diagnostic.getMessage())
-                .range(range)
-                .create();
-
-        SmartList<Annotation> asList = (SmartList<Annotation>) holder;
-        return asList.get(asList.size() - 1);
+        return holder.newAnnotation(lspToIntellijAnnotationsMap.get(diagnostic.getSeverity()), diagnostic.getMessage())
+                     .range(range);
     }
 
     private void createAnnotations(AnnotationHolder holder, EditorEventManager eventManager) {
@@ -169,12 +171,14 @@ public class LSPAnnotator extends ExternalAnnotator<Object, Object> {
 
         List<Annotation> annotations = new ArrayList<>();
         diagnostics.forEach(d -> {
-            Annotation annotation = createAnnotation(editor, holder, d);
+            var annotation = createAnnotation(editor, holder, d);
             if (annotation != null) {
                 if (d.getTags() != null && d.getTags().contains(DiagnosticTag.Deprecated)) {
-                    annotation.setHighlightType(ProblemHighlightType.LIKE_DEPRECATED);
+                    annotation.highlightType(ProblemHighlightType.LIKE_DEPRECATED);
                 }
-                annotations.add(annotation);
+                annotation.create();
+                var theList = (SmartList<Annotation>) holder;
+                annotations.add(theList.get(theList.size() - 1));
             }
         });
 

@@ -31,11 +31,6 @@ public class LSPProjectManagerListener implements ProjectManagerListener {
     private static final Logger LOG = Logger.getInstance(LSPProjectManagerListener.class);
 
     @Override
-    public void projectOpened(@Nullable final Project project) {
-        // Todo
-    }
-
-    @Override
     public void projectClosing(@NotNull Project project) {
         // Removes all the attached LSP status widgets before closing a project. Otherwise the old status widget will
         // not be removed when opening a new project in the same project window.
