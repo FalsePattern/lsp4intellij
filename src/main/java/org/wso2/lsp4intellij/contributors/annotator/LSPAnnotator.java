@@ -136,7 +136,7 @@ public class LSPAnnotator extends ExternalAnnotator<Object, Object> {
         if (annotations == null) {
             return;
         }
-        var requests = eventManager.fetchAnnotationRequests();
+        var requests = eventManager.fetchQuickFixes();
         annotations.forEach(annotation -> {
             if  (annotation.getQuickFixes() != null && !annotation.getQuickFixes().isEmpty()) {
                 AnnotationBuilder builder = holder.newAnnotation(annotation.getSeverity(), annotation.getMessage());
@@ -147,7 +147,10 @@ public class LSPAnnotator extends ExternalAnnotator<Object, Object> {
             } else if (requests.containsKey(annotation)) {
                 AnnotationBuilder builder = holder.newAnnotation(annotation.getSeverity(), annotation.getMessage());
                 var request = requests.remove(annotation);
-                builder.newFix(request.action()).range(request.range()).registerFix().create();
+                for (var quickFixInfo: request) {
+                    builder = builder.withFix(quickFixInfo.action());
+                }
+                builder.create();
             }
         });
     }
@@ -174,7 +177,7 @@ public class LSPAnnotator extends ExternalAnnotator<Object, Object> {
             var annotation = createAnnotation(editor, holder, d);
             if (annotation != null) {
                 if (d.getTags() != null && d.getTags().contains(DiagnosticTag.Deprecated)) {
-                    annotation.highlightType(ProblemHighlightType.LIKE_DEPRECATED);
+                    annotation = annotation.highlightType(ProblemHighlightType.LIKE_DEPRECATED);
                 }
                 annotation.create();
                 var theList = (SmartList<Annotation>) holder;

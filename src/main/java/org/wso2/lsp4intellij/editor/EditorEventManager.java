@@ -24,8 +24,6 @@ import com.intellij.codeInsight.lookup.LookupElementBuilder;
 import com.intellij.codeInsight.template.TemplateManager;
 import com.intellij.codeInsight.template.impl.TemplateImpl;
 import com.intellij.codeInsight.template.impl.TextExpression;
-import com.intellij.lang.Language;
-import com.intellij.lang.LanguageDocumentation;
 import com.intellij.lang.annotation.Annotation;
 import com.intellij.lang.annotation.AnnotationHolder;
 import com.intellij.lang.annotation.HighlightSeverity;
@@ -134,7 +132,7 @@ public class EditorEventManager {
     private final List<Diagnostic> diagnostics = new ArrayList<>();
     private AnnotationHolder anonHolder;
     private List<Annotation> annotations = new ArrayList<>();
-    private WeakHashMap<Annotation, CodeActionRequest> annotationRequests = new WeakHashMap<>();
+    private WeakHashMap<Annotation, List<QuickFixRequest>> quickFixes = new WeakHashMap<>();
     private volatile boolean diagnosticSyncRequired = true;
     private volatile boolean codeActionSyncRequired = false;
 
@@ -445,8 +443,8 @@ public class EditorEventManager {
         return this.annotations;
     }
 
-    public synchronized Map<Annotation, CodeActionRequest> fetchAnnotationRequests() {
-        return annotationRequests;
+    public synchronized Map<Annotation, List<QuickFixRequest>> fetchQuickFixes() {
+        return quickFixes;
     }
 
     public synchronized void setAnnotations(List<Annotation> annotations) {
@@ -1418,9 +1416,9 @@ public class EditorEventManager {
                         int start = annotation.getStartOffset();
                         int end = annotation.getEndOffset();
                         if (start <= caretPos && end >= caretPos) {
-                            annotationRequests.put(annotation,
-                                                   new CodeActionRequest(new LSPCommandFix(FileUtils.editorToURIString(editor), command),
-                                                                         new TextRange(start, end)));
+                            quickFixes.computeIfAbsent(annotation, (ignored) -> new ArrayList<>())
+                                      .add(new QuickFixRequest(new LSPCommandFix(FileUtils.editorToURIString(editor), command),
+                                                               new TextRange(start, end)));
                             codeActionSyncRequired = true;
                         }
                     });
@@ -1431,9 +1429,9 @@ public class EditorEventManager {
                         int start = annotation.getStartOffset();
                         int end = annotation.getEndOffset();
                         if (start <= caretPos && end >= caretPos) {
-                            annotationRequests.put(annotation,
-                                                   new CodeActionRequest(new LSPCodeActionFix(FileUtils.editorToURIString(editor),
-                                                                                              codeAction), new TextRange(start, end)));
+                            quickFixes.computeIfAbsent(annotation, (ignored) -> new ArrayList<>())
+                                      .add(new QuickFixRequest(new LSPCodeActionFix(FileUtils.editorToURIString(editor),
+                                                                                    codeAction), new TextRange(start, end)));
                             codeActionSyncRequired = true;
                         }
                     });
