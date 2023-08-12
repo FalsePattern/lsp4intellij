@@ -221,54 +221,53 @@ public class EditorEventManager {
      * @param e the event
      */
     public void mouseMoved(EditorMouseEvent e) {
-
-        if (e.getEditor() != editor) {
-            LOG.error("Wrong editor for EditorEventManager");
-            return;
-        }
-
-        PsiFile psiFile = PsiDocumentManager.getInstance(project).getPsiFile(editor.getDocument());
-        if (psiFile == null) {
-            return;
-        }
-        Language language = psiFile.getLanguage();
-        if ((!LanguageDocumentation.INSTANCE.allForLanguage(language).isEmpty() && !isSupportedLanguageFile(psiFile))
-                || (!getIsCtrlDown() && !EditorSettingsExternalizable.getInstance().isShowQuickDocOnMouseOverElement())) {
-            return;
-        }
-
-        long curTime = System.nanoTime();
-        if (predTime == (-1L) || ctrlTime == (-1L)) {
-            predTime = curTime;
-            ctrlTime = curTime;
-        } else {
-            LogicalPosition lPos = getPos(e);
-            if (lPos == null || getIsKeyPressed() && !getIsCtrlDown()) {
-                return;
-            }
-
-            int offset = editor.logicalPositionToOffset(lPos);
-            if ((getIsCtrlDown() || EditorSettingsExternalizable.getInstance().isShowQuickDocOnMouseOverElement())
-                    && curTime - ctrlTime > CTRL_THRESH) {
-                if (getCtrlRange() == null || !getCtrlRange().highlightContainsOffset(offset)) {
-                    if (currentHint != null) {
-                        currentHint.hide();
-                    }
-                    currentHint = null;
-                    if (getCtrlRange() != null) {
-                        getCtrlRange().dispose();
-                    }
-                    setCtrlRange(null);
-                    pool(() -> requestAndShowDoc(lPos, e.getMouseEvent().getPoint()));
-                } else if (getCtrlRange().definitionContainsOffset(offset)) {
-                    createAndShowEditorHint(editor, "Click to show usages", editor.offsetToXY(offset));
-                } else {
-                    editor.getContentComponent().setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-                }
-                ctrlTime = curTime;
-            }
-            predTime = curTime;
-        }
+//        if (e.getEditor() != editor) {
+//            LOG.error("Wrong editor for EditorEventManager");
+//            return;
+//        }
+//
+//        PsiFile psiFile = PsiDocumentManager.getInstance(project).getPsiFile(editor.getDocument());
+//        if (psiFile == null) {
+//            return;
+//        }
+//        Language language = psiFile.getLanguage();
+//        if ((!LanguageDocumentation.INSTANCE.allForLanguage(language).isEmpty() && !isSupportedLanguageFile(psiFile))
+//                || (!getIsCtrlDown() && !EditorSettingsExternalizable.getInstance().isShowQuickDocOnMouseOverElement())) {
+//            return;
+//        }
+//
+//        long curTime = System.nanoTime();
+//        if (predTime == (-1L) || ctrlTime == (-1L)) {
+//            predTime = curTime;
+//            ctrlTime = curTime;
+//        } else {
+//            LogicalPosition lPos = getPos(e);
+//            if (lPos == null || getIsKeyPressed() && !getIsCtrlDown()) {
+//                return;
+//            }
+//
+//            int offset = editor.logicalPositionToOffset(lPos);
+//            if ((getIsCtrlDown() || EditorSettingsExternalizable.getInstance().isShowQuickDocOnMouseOverElement())
+//                    && curTime - ctrlTime > CTRL_THRESH) {
+//                if (getCtrlRange() == null || !getCtrlRange().highlightContainsOffset(offset)) {
+//                    if (currentHint != null) {
+//                        currentHint.hide();
+//                    }
+//                    currentHint = null;
+//                    if (getCtrlRange() != null) {
+//                        getCtrlRange().dispose();
+//                    }
+//                    setCtrlRange(null);
+//                    pool(() -> requestAndShowDoc(lPos, e.getMouseEvent().getPoint()));
+//                } else if (getCtrlRange().definitionContainsOffset(offset)) {
+//                    createAndShowEditorHint(editor, "Click to show usages", editor.offsetToXY(offset));
+//                } else {
+//                    editor.getContentComponent().setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+//                }
+//                ctrlTime = curTime;
+//            }
+//            predTime = curTime;
+//        }
     }
 
     private boolean isSupportedLanguageFile(PsiFile file) {
@@ -702,23 +701,6 @@ public class EditorEventManager {
                 });
             }
         });
-    }
-
-    /**
-     * Immediately requests the server for documentation at the current editor position
-     *
-     * @param editor The editor
-     */
-    public void quickDoc(Editor editor) {
-        if (editor == this.editor) {
-            LogicalPosition caretPos = editor.getCaretModel().getLogicalPosition();
-            Point pointPos = editor.logicalPositionToXY(caretPos);
-            long currentTime = System.nanoTime();
-            pool(() -> requestAndShowDoc(caretPos, pointPos));
-            predTime = currentTime;
-        } else {
-            LOG.warn("Not same editor!");
-        }
     }
 
     /**
