@@ -51,13 +51,12 @@ see also jetbrains documentation: https://plugins.jetbrains.com/docs/intellij/pl
 
         <!-- needed for folding support -->
         <lang.foldingBuilder language="YOUR_LANGUAGE_ID" implementationClass="org.wso2.lsp4intellij.contributors.LSPFoldingRangeProvider" id="LSPFoldingRangeProvider" order="first" />
+
+        <!-- needed for documentation -->
+        <platform.backend.documentation.targetProvider implementation="org.wso2.lsp4intellij.contributors.LSPDocumentationTargetProvider"/>
     </extensions>
 
     <actions>
-        <!-- needed for hover -->
-        <action id="org.intellij.sdk.action.QuickDocAction" class="org.wso2.lsp4intellij.actions.LSPQuickDocAction">
-        </action>
-
         <!-- needed for find references -->
         <action class="org.wso2.lsp4intellij.actions.LSPReferencesAction" id="LSPFindUsages">
              <keyboard-shortcut first-keystroke="shift alt F7" keymap="$default"/>
