@@ -128,14 +128,23 @@ public class LSPServerStatusWidget implements StatusBarWidget {
             return icons.get(status);
         }
 
+        @SuppressWarnings("UsagesOfObsoleteApi")
         @Nullable
         @Override
         public Consumer<MouseEvent> getClickConsumer() {
             return (MouseEvent t) -> {
                 JBPopupFactory.ActionSelectionAid mnemonics = JBPopupFactory.ActionSelectionAid.MNEMONICS;
                 Component component = t.getComponent();
+                var wrapper = LanguageServerWrapper.forProject(project);
+                if (wrapper == null) {
+                    var popup = JBPopupFactory.getInstance().createMessage("No language server active.");
+                    Dimension dimension = popup.getContent().getPreferredSize();
+                    Point at = new Point(0, -dimension.height);
+                    popup.show(new RelativePoint(t.getComponent(), at));
+                    return;
+                }
                 List<AnAction> actions = new ArrayList<>();
-                if (LanguageServerWrapper.forProject(project).getStatus() == ServerStatus.INITIALIZED) {
+                if (wrapper.getStatus() == ServerStatus.INITIALIZED) {
                     actions.add(new ShowConnectedFiles());
                 }
                 actions.add(new ShowTimeouts());
@@ -160,8 +169,12 @@ public class LSPServerStatusWidget implements StatusBarWidget {
 
             @Override
             public void actionPerformed(@NotNull AnActionEvent e) {
+                var wrapper = LanguageServerWrapper.forProject(project);
+                if (wrapper == null) {
+                    return;
+                }
                 StringBuilder connectedFiles = new StringBuilder("Connected files :");
-                LanguageServerWrapper.forProject(project).getConnectedFiles().forEach(f -> connectedFiles.append(System.lineSeparator()).append(f));
+                wrapper.getConnectedFiles().forEach(f -> connectedFiles.append(System.lineSeparator()).append(f));
                 Messages.showInfoMessage(connectedFiles.toString(), "Connected Files");
             }
         }
@@ -206,7 +219,10 @@ public class LSPServerStatusWidget implements StatusBarWidget {
 
             @Override
             public void actionPerformed(@NotNull AnActionEvent anActionEvent) {
-                LanguageServerWrapper.forProject(project).restart();
+                var wrapper = LanguageServerWrapper.forProject(project);
+                if (wrapper != null) {
+                    wrapper.restart();
+                }
             }
 
         }
